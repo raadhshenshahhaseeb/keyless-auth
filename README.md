@@ -39,10 +39,14 @@ This project is a simple implementation of a keyless login system. It is a proof
 ---
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 ### 4. Login Flow
 =======
 ## 4. Login Flow
 >>>>>>> 6a9feaa (chore: flow in readme)
+=======
+### 4. Login Flow
+>>>>>>> 015bd25 (chore(readme): adding contributions, credits and v1 of flow diagram)
 1. **Enter Basic Credentials** (app password, username, or passkey)
 2. **Connect** to:
    - DApps (via Web3)  
