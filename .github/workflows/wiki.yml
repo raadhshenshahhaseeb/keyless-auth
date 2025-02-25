@@ -1,0 +1,38 @@
+name: Sync README to Wiki
+
+on:
+  push:
+    branches:
+      - main  # or your default branch
+    paths:
+      - 'README.md'
+
+jobs:
+  sync-wiki:
+    if: github.actor == 'raadhshenshahhaseeb'  # Replace with the code owner's GitHub username
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Clone wiki repository
+        run: |
+          git clone "https://${{ secrets.R2W }}@github.com/${{ github.repository }}.wiki.git" wiki
+
+      - name: Sync README to Wiki
+        run: |
+          set -e
+          # If the wiki/Home.md exists, compare it with README.md
+          if [ -f wiki/Home.md ]; then
+            if diff -q README.md wiki/Home.md > /dev/null; then
+              echo "No changes detected. Skipping commit."
+              exit 0
+            fi
+          fi
+          cp README.md wiki/Home.md
+          cd wiki
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add Home.md
+          git diff-index --quiet HEAD || git commit -m "docs: sync README to wiki"
+          git push
