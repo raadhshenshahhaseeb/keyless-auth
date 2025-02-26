@@ -5,3 +5,5 @@ env
 coverage.out
 data
 .log
+node_modules
+.vite
