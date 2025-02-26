@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend/groth16"
-	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
-	"math/big"
 	"os"
 )
 
@@ -17,9 +15,6 @@ type Circuit struct {
 }
 
 type cubic struct {
-	System        constraint.ConstraintSystem
-	Circuit       Circuit
-	compileConfig frontend.CompileConfig
 }
 
 func (c *Circuit) Define(api frontend.API) error {
@@ -31,35 +26,49 @@ func (c *Circuit) Define(api frontend.API) error {
 type Cubic interface {
 }
 
-func New(circuit *Circuit, field *big.Int) (Cubic, error) {
-	if &circuit == nil {
+func New(circuit *Circuit) (Cubic, error) {
+	if circuit == nil {
 		return nil, fmt.Errorf("circuit cannot be nil")
 	}
 
-	if field == nil {
-		field = ecc.BN254.ScalarField()
+	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &Circuit{})
+	if err != nil {
+		return nil, fmt.Errorf("constraint system error: %w", err)
 	}
 
-	builder := r1cs.NewBuilder
+	witness, err := frontend.NewWitness(circuit, ecc.BN254.ScalarField())
+	if err != nil {
+		return nil, fmt.Errorf("witness error: %w", err)
+	}
 
-	system, _ := frontend.Compile(field, builder, circuit)
-	witness, _ := frontend.NewWitness(circuit, ecc.BN254.ScalarField())
-	publicWitness, _ := witness.Public()
+	publicWitness, err := witness.Public()
+	if err != nil {
+		return nil, fmt.Errorf("pub witness error: %w", err)
+	}
 
-	pk, vk, _ := groth16.Setup(system)
-	proof, _ := groth16.Prove(system, pk, witness)
-	err := groth16.Verify(proof, vk, publicWitness)
+	pk, vk, err := groth16.Setup(r1cs)
+	if err != nil {
+		return nil, fmt.Errorf("setup error: %w", err)
+	}
+
+	proof, err := groth16.Prove(r1cs, pk, witness)
+	if err != nil {
+		return nil, fmt.Errorf("proof error: %w", err)
+	}
+
+	err = groth16.Verify(proof, vk, publicWitness)
 	if err != nil {
 		panic(err)
 	}
 
-	verifySolidityPath := fmt.Sprintf("..%conchain%ccontracts%ccubic_groth16.sol", os.PathSeparator, os.PathSeparator, os.PathSeparator)
-	f, _ := os.OpenFile(verifySolidityPath, os.O_CREATE|os.O_WRONLY, 0666)
+	verifySolidityPath := fmt.Sprintf("../%ctransaction%conchain%ccontracts%ccubic_groth16.sol", os.PathSeparator, os.PathSeparator, os.PathSeparator, os.PathSeparator)
+	f, err := os.OpenFile(verifySolidityPath, os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open verify solution file: %w", err)
+	}
+
 	defer f.Close()
 	vk.ExportSolidity(f)
 
-	return &cubic{
-		System:  system,
-		Circuit: *circuit,
-	}, nil
+	return &cubic{}, nil
 }
