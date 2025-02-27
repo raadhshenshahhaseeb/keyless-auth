@@ -1,5 +1,6 @@
 package main
 
+<<<<<<< HEAD:circuit/main.go
 import (
 	"log"
 	"os"
@@ -111,4 +112,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to generate Groth16 keys: %v", err)
 	}
+=======
+func main() {
+
+>>>>>>> 0fee966 (Dir restructuring (#2)):main.go
 }
