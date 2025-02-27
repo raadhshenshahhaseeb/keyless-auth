@@ -9,7 +9,6 @@ on:
 
 jobs:
   sync-wiki:
-    if: github.actor == 'raadhshenshahhaseeb'  # Replace with the code owner's GitHub username
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
