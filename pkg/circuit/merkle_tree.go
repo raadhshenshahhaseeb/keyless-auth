@@ -2,6 +2,7 @@ package circuit
 
 import (
 	"fmt"
+	"github.com/consensys/gnark/std/hash"
 
 	"github.com/consensys/gnark/frontend"
 	poseidon2 "github.com/consensys/gnark/std/permutation/poseidon2"
@@ -26,8 +27,8 @@ fetch('/generate-proof', {
 });
 **/
 
-// Circuit defines the zk-SNARK circuit
-type Circuit struct {
+// Circuits defines the zk-SNARK circuit
+type Circuits struct {
 	Leaf      frontend.Variable   `gnark:",public"` // Public input: leaf
 	Root      frontend.Variable   `gnark:",public"` // Public input: Merkle root
 	Siblings  []frontend.Variable // Private input: sibling hashes
@@ -43,7 +44,7 @@ func NewMerkleDamgardHasher(api frontend.API) (hash.FieldHasher, error) {
 }
 
 // Define declares the circuit's constraints
-func (circuit *Circuit) Define(api frontend.API) error {
+func (circuit *Circuits) Define(api frontend.API) error {
 	hash, _ := NewMerkleDamgardHasher(api)
 	// Initialize the computed hash with the leaf
 	computedHash := circuit.Leaf

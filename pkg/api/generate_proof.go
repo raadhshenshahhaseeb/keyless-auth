@@ -34,7 +34,7 @@ func generateProofHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Compile the circuit
-	var circuit circuit.Circuit
+	var circuit circuit.Circuits
 	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
 	if err != nil {
 		http.Error(w, "Failed to compile circuit", http.StatusInternalServerError)
