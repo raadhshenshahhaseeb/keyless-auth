@@ -1,22 +1,46 @@
 import React, { useState } from 'react';
 import Header from '../components/Header';
+import TokensList from '../components/TokensList';
+import NftGrid from '../components/NftGrid';
+import ActivityList from '../components/ActivityList';
 import '../css/Wallet.css';
-import {NetworkIcon,TokenIcon} from '@web3icons/react'
+import { NetworkIcon } from '@web3icons/react';
 
 const Wallet: React.FC = () => {
   const [activeTab, setActiveTab] = useState('tokens');
   const [showNetworkDropdown, setShowNetworkDropdown] = useState(false);
   const [selectedNetwork, setSelectedNetwork] = useState({
     name: 'Ethereum',
-    logo: <NetworkIcon id='etereum' size={32} variant="branded"/>,
-    id: 'ethereum'
+    logo: <NetworkIcon id='ethereum' size={32} variant="branded"/>,
+    id: 'ethereum',
+    chainId: '0x1'
   });
 
   const networks = [
-    { name: 'Ethereum', logo: <NetworkIcon id='ethereum' size={32} variant="branded" />, id: 'ethereum' },
-    { name: 'Polygon', logo: <NetworkIcon id='polygon' size={32} variant="branded" />, id: 'polygon' },   
-    { name: 'Optimism', logo: <NetworkIcon id='optimism' size={32} variant="branded" />, id: 'optimism' },
-    { name: 'Base', logo: <NetworkIcon id='base' size={32} variant="branded" />, id: 'base' },
+    { 
+      name: 'Ethereum', 
+      logo: <NetworkIcon id='ethereum' size={32} variant="branded" />, 
+      id: 'ethereum',
+      chainId: '0x1'
+    },
+    { 
+      name: 'Polygon', 
+      logo: <NetworkIcon id='polygon' size={32} variant="branded" />, 
+      id: 'polygon',
+      chainId: '0x89' 
+    },   
+    { 
+      name: 'Optimism', 
+      logo: <NetworkIcon id='optimism' size={32} variant="branded" />, 
+      id: 'optimism',
+      chainId: '0xa' 
+    },
+    { 
+      name: 'Base', 
+      logo: <NetworkIcon id='base' size={32} variant="branded" />, 
+      id: 'base',
+      chainId: '0x2105'
+    },
   ];
 
   const handleNetworkChange = (network: typeof networks[0]) => {
@@ -82,31 +106,9 @@ const Wallet: React.FC = () => {
       </div>
 
       <div className="wallet-content">
-        {activeTab === 'tokens' && (
-          <div className="tokens-list">
-            <div className="token-item">
-              <TokenIcon address="0xc944e90c64b2c07662a292be6244bdf05cda44a7" network={selectedNetwork.id} size="2.5rem" className='token-logo' />
-              <div className="token-info">
-                <span className="token-name">Ethereum</span>
-                <span className="token-balance">2.5 ETH</span>
-              </div>
-              <span className="token-value">$4,250.00</span>
-            </div>
-            {/* Add more token items as needed */}
-          </div>
-        )}
-
-        {activeTab === 'nfts' && (
-          <div className="nfts-grid">
-            {/* Add NFT cards here */}
-          </div>
-        )}
-
-        {activeTab === 'activity' && (
-          <div className="activity-list">
-            {/* Add activity items here */}
-          </div>
-        )}
+      {activeTab === 'tokens' && <TokensList selectedNetwork={selectedNetwork} />}
+      {activeTab === 'nfts' && <NftGrid />}
+      {activeTab === 'activity' && <ActivityList selectedNetwork={selectedNetwork} />}
       </div>
     </div>
     </>

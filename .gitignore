@@ -1,7 +1,7 @@
 .idea
 .vscode
 env.json
-env
+.env
 coverage.out
 data
 .log
