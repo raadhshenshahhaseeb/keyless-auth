@@ -2,25 +2,20 @@ package main
 
 import (
 	"context"
-<<<<<<< HEAD
 	"fmt"
-=======
->>>>>>> bbd94c8 (WIP: Circuit and merkle tree logic (#7))
+
 	"keyless-auth/api"
 	"keyless-auth/repository"
 	"keyless-auth/storage"
 	"log"
-<<<<<<< HEAD
+
 	"net/http"
 	"os"
-=======
->>>>>>> bbd94c8 (WIP: Circuit and merkle tree logic (#7))
 
 	"github.com/gorilla/mux"
 	"github.com/redis/go-redis/v9"
 )
 
-<<<<<<< HEAD
 var (
 	redisHost     string
 	redisPort     string
@@ -48,12 +43,6 @@ func main() {
 		Username: redisUsername,
 		Addr:     redisHost + ":" + redisPort,
 		Password: redisPassword,
-=======
-func main() {
-	db, err := storage.NewRedisClient(context.Background(), &redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
->>>>>>> bbd94c8 (WIP: Circuit and merkle tree logic (#7))
 		DB:       0,
 	})
 
@@ -72,11 +61,8 @@ func main() {
 	router.HandleFunc("/credentials/{credential}", credentialsHandler.GetWalletAddressByCredential).Methods("GET")
 	router.HandleFunc("/credentials", credentialsHandler.GenerateCredential).Methods("POST")
 	router.HandleFunc("/proof", proofHandler.GenerateProof).Methods("POST")
-<<<<<<< HEAD
 
 	serverAddr := fmt.Sprintf(":%s", getEnvOrDefault("APP_PORT", "8080"))
 	log.Printf("Server starting on %s", serverAddr)
 	log.Fatal(http.ListenAndServe(serverAddr, router))
-=======
->>>>>>> bbd94c8 (WIP: Circuit and merkle tree logic (#7))
 }
