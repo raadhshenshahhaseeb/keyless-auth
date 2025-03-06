@@ -6,11 +6,6 @@ import (
 	"keyless-auth/circuit"
 	"keyless-auth/repository"
 	"net/http"
-
-	"github.com/consensys/gnark-crypto/ecc"
-	"github.com/consensys/gnark/backend/groth16"
-	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/frontend/cs/r1cs"
 )
 
 type ProofRequest struct {
@@ -41,39 +36,9 @@ func (h *ProofHandler) GenerateProof(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ckt circuit.ZKAuthCircuit
-	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &ckt)
+	proof, err := circuit.CompileCircuit(req)
 	if err != nil {
 		http.Error(w, "Failed to compile circuit", http.StatusInternalServerError)
-		return
-	}
-
-	pk, _, err := groth16.Setup(r1cs)
-	if err != nil {
-		http.Error(w, "Failed to generate keys", http.StatusInternalServerError)
-		return
-	}
-	assignment := circuit.ZKAuthCircuit{
-		Leaf:          frontend.Variable(req.Leaf),
-		Root:          frontend.Variable(req.Root),
-		ProofElements: make([]frontend.Variable, len(req.Siblings)),
-		ProofIndex:    frontend.Variable(req.Positions),
-	}
-
-	for i := 0; i < len(req.Siblings); i++ {
-		assignment.ProofElements[i] = frontend.Variable(req.Siblings[i])
-	}
-	assignment.ProofIndex = frontend.Variable(1)
-
-	witness, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
-	if err != nil {
-		http.Error(w, "Failed to create witness", http.StatusInternalServerError)
-		return
-	}
-
-	proof, err := groth16.Prove(r1cs, pk, witness)
-	if err != nil {
-		http.Error(w, "Failed to generate proof", http.StatusInternalServerError)
 		return
 	}
 
