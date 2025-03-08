@@ -23,10 +23,10 @@ func (cred *CredentialsRepository) SaveCredential(credential string) error {
 	}
 
 	// Add leaf to redis list (for ordered retrieval)
-	// if err := cred.db.Client.RPush(ctx, "merkle:credentials:list", credential).Err(); err != nil {
-	// 	log.Printf("Failed to add credential to redis list: %v", err)
-	// 	return err
-	// }
+	if err := cred.db.Client.RPush(ctx, "merkle:credentials:list", credential).Err(); err != nil {
+		log.Printf("Failed to add credential to redis list: %v", err)
+		return err
+	}
 	return nil
 }
 
@@ -38,7 +38,7 @@ func (cred *CredentialsRepository) DoesCredentialExist(credential string) (bool,
 func (cred *CredentialsRepository) GetCredentials() ([]string, error) {
 	ctx := context.Background()
 	// Get all credentials from redis list to build merkle tree
-	creds, err := cred.db.Client.LRange(ctx, "merkle:credentials", 0, -1).Result()
+	creds, err := cred.db.Client.LRange(ctx, "merkle:credentials:list", 0, -1).Result()
 	if err != nil {
 		return nil, err
 	}

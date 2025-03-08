@@ -2,6 +2,7 @@ package service
 
 import (
 	"keyless-auth/repository"
+	"log"
 
 	"github.com/wealdtech/go-merkletree"
 	"github.com/wealdtech/go-merkletree/keccak256"
@@ -17,11 +18,11 @@ func NewMerkleTreeService(credRepo *repository.CredentialsRepository) *MerkleTre
 	}
 }
 
-func (s *MerkleTreeService) GenerateMerkleTree(newCredential string) ([]byte, error) {
+func (s *MerkleTreeService) GetMerkleTree() (*merkletree.MerkleTree, int, error) {
 	// fetch all credentials
 	credentials, err := s.credRepo.GetCredentials()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var data [][]byte
@@ -29,40 +30,28 @@ func (s *MerkleTreeService) GenerateMerkleTree(newCredential string) ([]byte, er
 		data = append(data, []byte(credential))
 	}
 
-	// add new credential
-	data = append(data, []byte(newCredential))
-
 	// build tree
 	tree, err := merkletree.NewUsing(data, keccak256.New(), []byte{})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// return root
-	return tree.Root(), nil
+	return tree, len(credentials), nil
 }
 
 func (s *MerkleTreeService) GenerateMerkleProof(credential string) (*merkletree.Proof, error) {
 	// fetch all credentials
-	credentials, err := s.credRepo.GetCredentials()
+	tree, _, err := s.GetMerkleTree()
 	if err != nil {
-		return nil, err
-	}
-
-	var data [][]byte
-	for _, credential := range credentials {
-		data = append(data, []byte(credential))
-	}
-
-	// build tree
-	tree, err := merkletree.NewUsing(data, keccak256.New(), []byte{})
-	if err != nil {
+		log.Printf("Failed to get merkle tree: %v", err)
 		return nil, err
 	}
 
 	// generate proof
 	proof, err := tree.GenerateProof([]byte(credential))
 	if err != nil {
+		log.Printf("Failed to generate merkle proof: %v", err)
 		return nil, err
 	}
 

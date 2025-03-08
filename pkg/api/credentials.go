@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"keyless-auth/repository"
 	"keyless-auth/service"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gorilla/mux"
+	"github.com/wealdtech/go-merkletree"
 )
 
 type CredentialRequest struct {
@@ -17,6 +19,15 @@ type CredentialRequest struct {
 
 type CredentialResponse struct {
 	WalletAddress string `json:"wallet_address"`
+}
+
+type MerkleRootResponse struct {
+	MerkleRoot string `json:"merkle_root"`
+	NumLeaves  int    `json:"num_leaves"`
+}
+
+type MerkleProofResponse struct {
+	Proof *merkletree.Proof `json:"proof"`
 }
 
 type CredentialsHandler struct {
@@ -33,7 +44,32 @@ func NewCredentialsHandler(credRepo *repository.CredentialsRepository, walletRep
 	}
 }
 
-// generate wallet address
+func (h *CredentialsHandler) GetMerkleRoot(w http.ResponseWriter, r *http.Request) {
+	tree, numLeaves, err := h.merkleTree.GetMerkleTree()
+	if err != nil {
+		http.Error(w, "Failed to get merkle root", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(MerkleRootResponse{
+		MerkleRoot: "0x" + hex.EncodeToString(tree.Root()),
+		NumLeaves:  numLeaves,
+	})
+}
+
+func (h *CredentialsHandler) GenerateMerkleProof(w http.ResponseWriter, r *http.Request) {
+	credential := mux.Vars(r)["credential"]
+
+	proof, err := h.merkleTree.GenerateMerkleProof(credential)
+	if err != nil {
+		http.Error(w, "Failed to generate merkle proof", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(MerkleProofResponse{
+		Proof: proof,
+	})
+}
+
 func GenerateWalletAddress() (string, []byte, error) {
 	privKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -57,14 +93,6 @@ func (h *CredentialsHandler) GenerateCredential(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// TODO: generate merkle tree root
-	// root, err := h.merkleTree.GenerateMerkleTree(req.HashedCredential)
-	// if err != nil {
-	// 	http.Error(w, "Failed to generate merkle tree root", http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// store merkle tree root
 	// store leaf in merkle tree
 	if err := h.credRepo.SaveCredential(req.HashedCredential); err != nil {
 		log.Printf("Failed to save credential: %v", err)
