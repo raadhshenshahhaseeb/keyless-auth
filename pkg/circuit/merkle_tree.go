@@ -26,6 +26,9 @@ func (circuit *ZKAuthCircuit) Define(api frontend.API) error {
 	hashed := h.Sum()
 
 	depth := len(circuit.ProofElements)
+	if depth == 0 {
+		depth = MAX_DEPTH
+	}
 	proofIndices := api.ToBinary(circuit.ProofIndex, depth)
 
 	// Continuously hash with the proof elements
