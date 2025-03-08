@@ -55,12 +55,17 @@ func main() {
 	credentialsRepo := repository.NewCredentialsRepository(db)
 	proofHandler := api.NewProofHandler(walletRepo)
 	credentialsHandler := api.NewCredentialsHandler(credentialsRepo, walletRepo)
+	userRepo := repository.NewUserRepository(db)
+	googleHandler := api.NewGoogleHandler(userRepo)
 
 	router := mux.NewRouter()
 
 	router.HandleFunc("/credentials/{credential}", credentialsHandler.GetWalletAddressByCredential).Methods("GET")
 	router.HandleFunc("/credentials", credentialsHandler.GenerateCredential).Methods("POST")
 	router.HandleFunc("/proof", proofHandler.GenerateProof).Methods("POST")
+
+	router.HandleFunc("/auth/google/login", googleHandler.HandleGoogleLogin).Methods("GET")
+	router.HandleFunc("/auth/google/callback", googleHandler.HandleGoogleCallback).Methods("GET")
 
 	serverAddr := fmt.Sprintf(":%s", getEnvOrDefault("APP_PORT", "8080"))
 	log.Printf("Server starting on %s", serverAddr)
