@@ -3,6 +3,7 @@ module zk-circuit
 go 1.23.4
 
 require (
+	github.com/PolyhedraZK/ExpanderCompilerCollection v1.0.0
 	github.com/consensys/gnark v0.12.0
 	github.com/consensys/gnark-crypto v0.16.0
 )

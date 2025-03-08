@@ -1,26 +1,40 @@
 package circuit
 
 import (
+	"os"
+
 	"keyless-auth/domain"
 
-	"github.com/consensus-shipyard/go-gnark/frontend"
-	"github.com/consensus-shipyard/go-gnark/frontend/cs/r1cs"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend/groth16"
+	"github.com/consensys/gnark/constraint"
+	"github.com/consensys/gnark/frontend"
+	"github.com/consensys/gnark/frontend/cs/r1cs"
 )
 
-func Compile() (*groth16.ProvingKey, *r1cs.R1CS, error) {
+var (
+	MAX_DEPTH = 256
+)
+
+func Compile() (*groth16.ProvingKey, constraint.ConstraintSystem, error) {
 	var ckt ZKAuthCircuit
 	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &ckt)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pk, _, err := groth16.Setup(r1cs)
-	if err != nil {
-		return nil, err
+	pk := groth16.NewProvingKey(ecc.BN254)
+	{
+		f, err := os.Open("mt.g16.pk")
+		if err != nil {
+			return nil, nil, err
+		}
+		_, err = pk.ReadFrom(f)
+		if err != nil {
+			return nil, nil, err
+		}
+		f.Close()
 	}
-
 	return &pk, r1cs, nil
 }
 
@@ -53,8 +67,4 @@ func CompileCircuit(proof domain.Proof) (*groth16.Proof, error) {
 	}
 
 	return &prf, nil
-}
-
-func main() {
-	Compile()
 }

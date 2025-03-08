@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"flag"
 	"log"
 	"os"
 
@@ -9,6 +11,9 @@ import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"github.com/consensys/gnark/std/hash/mimc"
+
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/test"
 )
 
 var (
@@ -106,9 +111,60 @@ func GenerateGroth16() error {
 	return nil
 }
 
-func main() {
-	err := GenerateGroth16()
+func GenerateExpander() error {
+	assignment := &ZKAuthCircuit{
+		Root: "123456789012345678901234567890123456789012345678901234567890abcd",
+		ProofElements: []frontend.Variable{
+			"234567890123456789012345678901234567890123456789012345678901dcba",
+			"345678901234567890123456789012345678901234567890123456789012efab",
+		},
+		ProofIndex: 0,
+		Leaf:       "123456789012345678901234567890123456789012345678901234567890fedc",
+	}
+	circuit, err := ecgo.Compile(ecc.BN254.ScalarField(), assignment)
 	if err != nil {
-		log.Fatalf("Failed to generate Groth16 keys: %v", err)
+		return err
+	}
+
+	c := circuit.GetLayeredCircuit()
+	os.WriteFile("expander_circuit.txt", c.Serialize(), 0o644)
+	inputSolver := circuit.GetInputSolver()
+	witness, err := inputSolver.SolveInputAuto(nil)
+	if err != nil {
+		return err
+	}
+	os.WriteFile("expander_witness.txt", witness.Serialize(), 0o644)
+	if !test.CheckCircuit(c, witness) {
+		return errors.New("witness is not valid")
+	}
+	return nil
+}
+
+func main() {
+	// Command line flags:
+	// -expander: Generate expander circuit and witness files
+	//   Example: ./main -expander
+	//
+	// -groth16: Generate Groth16 proving/verification keys and Solidity verifier
+	//   Example: ./main -groth16
+	expander := flag.Bool("expander", false, "Generate expander")
+	groth16 := flag.Bool("groth16", false, "Generate Groth16 keys")
+	flag.Parse()
+	if !*expander && !*groth16 {
+		log.Fatal("Please provide a command: 'expander' or 'groth16'")
+	}
+
+	if *expander {
+		err := GenerateExpander()
+		if err != nil {
+			log.Fatalf("Failed to generate expander: %v", err)
+		}
+	} else if *groth16 {
+		err := GenerateGroth16()
+		if err != nil {
+			log.Fatalf("Failed to generate Groth16 keys: %v", err)
+		}
+	} else {
+		log.Fatalf("Invalid argument: %v", os.Args[1])
 	}
 }
