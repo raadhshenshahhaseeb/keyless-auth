@@ -4,6 +4,7 @@ import (
 	"context"
 	"keyless-auth/domain"
 	"keyless-auth/storage"
+	"log"
 	"time"
 )
 
@@ -21,12 +22,26 @@ func (r *WalletRepository) Save(address string, privKey []byte, credential strin
 		PrivateKey: privKey,
 		Credential: credential,
 	}
-	return r.db.Save(context.Background(), storage.GenerateCacheKey("wallet", credential), wallet, time.Hour*24)
+	log.Printf("Saving wallet: %v", wallet)
+
+	serializedWallet, err := storage.Serialize(wallet)
+	if err != nil {
+		log.Printf("Failed to serialize wallet: %v", err)
+		return err
+	}
+
+	err = r.db.Save(context.Background(), storage.GenerateCacheKey("wallet", credential), serializedWallet, time.Hour*24)
+	if err != nil {
+		log.Printf("Failed to save wallet: %v", err)
+		return err
+	}
+	return nil
 }
 
 func (r *WalletRepository) GetWalletByCredential(hashedCredential string) (*domain.Wallet, error) {
 	value, err := r.db.Get(context.Background(), storage.GenerateCacheKey("wallet", hashedCredential))
 	if err != nil {
+		log.Printf("Failed to get wallet by credential: %v", err)
 		return nil, err
 	}
 	var wallet domain.Wallet

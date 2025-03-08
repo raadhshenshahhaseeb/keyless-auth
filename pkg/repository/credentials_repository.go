@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"keyless-auth/storage"
+	"log"
 )
 
 type CredentialsRepository struct {
@@ -17,13 +18,15 @@ func (cred *CredentialsRepository) SaveCredential(credential string) error {
 	ctx := context.Background()
 	// Add leaf to redis set (for fast membership check)
 	if err := cred.db.Client.SAdd(ctx, "merkle:credentials:set", credential).Err(); err != nil {
+		log.Printf("Failed to add credential to redis set: %v", err)
 		return err
 	}
 
 	// Add leaf to redis list (for ordered retrieval)
-	if err := cred.db.Client.RPush(ctx, "merkle:credentials:list", credential).Err(); err != nil {
-		return err
-	}
+	// if err := cred.db.Client.RPush(ctx, "merkle:credentials:list", credential).Err(); err != nil {
+	// 	log.Printf("Failed to add credential to redis list: %v", err)
+	// 	return err
+	// }
 	return nil
 }
 

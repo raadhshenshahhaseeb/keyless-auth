@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"keyless-auth/repository"
 	"keyless-auth/service"
+	"log"
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -66,6 +67,7 @@ func (h *CredentialsHandler) GenerateCredential(w http.ResponseWriter, r *http.R
 	// store merkle tree root
 	// store leaf in merkle tree
 	if err := h.credRepo.SaveCredential(req.HashedCredential); err != nil {
+		log.Printf("Failed to save credential: %v", err)
 		http.Error(w, "Failed to save credential", http.StatusInternalServerError)
 		return
 	}
@@ -79,6 +81,7 @@ func (h *CredentialsHandler) GenerateCredential(w http.ResponseWriter, r *http.R
 
 	// store wallet
 	if err := h.walletRepo.Save(walletAddress, privKey, req.HashedCredential); err != nil {
+		log.Printf("Failed to save wallet: %v", err)
 		http.Error(w, "Failed to save wallet", http.StatusInternalServerError)
 		return
 	}
