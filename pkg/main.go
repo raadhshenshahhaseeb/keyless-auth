@@ -3,17 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-
-	"keyless-auth/api"
-	"keyless-auth/repository"
-	"keyless-auth/storage"
 	"log"
-
 	"net/http"
 	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/redis/go-redis/v9"
+
+	"keyless-auth/api"
+	"keyless-auth/repository"
+	"keyless-auth/storage"
 )
 
 var (
@@ -61,7 +60,7 @@ func main() {
 	router := mux.NewRouter()
 
 	// credentials
-	router.HandleFunc("/credentials/{credential}", credentialsHandler.GetWalletAddressByCredential).Methods("GET")
+	router.HandleFunc("/credentials/{credential}", credentialsHandler.GetWalletByCredential).Methods("GET")
 	router.HandleFunc("/credentials", credentialsHandler.GenerateCredential).Methods("POST")
 	router.HandleFunc("/merkle-root", credentialsHandler.GetMerkleRoot).Methods("GET")
 	router.HandleFunc("/merkle-proof/{credential}", credentialsHandler.GenerateMerkleProof).Methods("GET")

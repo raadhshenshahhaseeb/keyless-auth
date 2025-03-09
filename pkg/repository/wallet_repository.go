@@ -2,10 +2,11 @@ package repository
 
 import (
 	"context"
-	"keyless-auth/domain"
-	"keyless-auth/storage"
 	"log"
 	"time"
+
+	"keyless-auth/domain"
+	"keyless-auth/storage"
 )
 
 type WalletRepository struct {
@@ -16,11 +17,12 @@ func NewWalletRepository(db *storage.Redis) *WalletRepository {
 	return &WalletRepository{db: db}
 }
 
-func (r *WalletRepository) Save(address string, privKey []byte, credential string) error {
+func (r *WalletRepository) Save(address string, privKey []byte, credential string, merkleRoot string) error {
 	wallet := &domain.Wallet{
 		Address:    address,
 		PrivateKey: privKey,
 		Credential: credential,
+		MerkleRoot: merkleRoot,
 	}
 	log.Printf("Saving wallet: %v", wallet)
 

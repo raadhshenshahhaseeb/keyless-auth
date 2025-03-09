@@ -5,6 +5,7 @@ go 1.23.4
 require (
 	github.com/consensys/gnark v0.12.0
 	github.com/consensys/gnark-crypto v0.15.0
+	github.com/google/uuid v1.6.0
 	github.com/redis/go-redis/v9 v9.7.1
 )
 
