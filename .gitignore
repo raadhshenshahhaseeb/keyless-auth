@@ -9,7 +9,7 @@ node_modules
 .vite
 .env
 node_modules
-
+contracts/.env
 # Hardhat files
 /cache
 /artifacts
