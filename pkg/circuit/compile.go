@@ -63,7 +63,7 @@ func CompileCircuit(proof domain.Proof) (*groth16.Proof, error) {
 		ProofIndex:    frontend.Variable(proof.Position),
 	}
 
-	assignment.ProofElements[0] = s1
+	assignment.ProofElements[0] = "o1" + s1
 	assignment.ProofElements[1] = s2
 
 	r1cs, pk, _, err := GenerateGroth16(&assignment)
