@@ -65,10 +65,8 @@ func (circuit *ZKAuthCircuit) Define(api frontend.API) error {
 	return nil
 }
 
-func GenerateGroth16() error {
-	var circuit ZKAuthCircuit
-
-	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
+func GenerateGroth16(assignment *ZKAuthCircuit) error {
+	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, assignment)
 	if err != nil {
 		return err
 	}
@@ -160,7 +158,13 @@ func main() {
 			log.Fatalf("Failed to generate expander: %v", err)
 		}
 	} else if *groth16 {
-		err := GenerateGroth16()
+		err := GenerateGroth16(&ZKAuthCircuit{
+			Root: "ed6cfd06d0c37b1f964a2e63e5dce2bab107297c4a5518392d08a2cea24794dc",
+			ProofElements: []frontend.Variable{
+				make([]frontend.Variable, 2)},
+			ProofIndex: 2,
+			Leaf:       "aae457593db8c6ab406c81939d4ffb39e9ac16aeceeb6e109d1593aff3b91ecd",
+		})
 		if err != nil {
 			log.Fatalf("Failed to generate Groth16 keys: %v", err)
 		}

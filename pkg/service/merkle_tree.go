@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,7 +46,6 @@ func (s *MerkleTreeService) WithNewCredential(newCredential string) (*merkletree
 
 	ctx := context.Background()
 
-	// TODO: hex and then encode to string before checking and storing
 	exists, err := s.credRepo.Exists(newCredential)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to check for duplicates: %w", err)
@@ -53,40 +54,20 @@ func (s *MerkleTreeService) WithNewCredential(newCredential string) (*merkletree
 		return nil, nil, nil, errors.New("credential already exists")
 	}
 
-	// TODO: hash credentials, encode them and then store them to repo
-	// hashedCred := hashCredential(newCredential)
-	// hashedHex := hex.EncodeToString(hashedCred)
-	//
-	// err = s.credRepo.AddGlobalCredential(ctx, hashedHex)
-	// if err != nil {
-	// 	return nil, nil, nil, fmt.Errorf("failed to append to global credentials: %w", err)
-	// }
-
 	err = s.credRepo.AddGlobalCredential(ctx, newCredential)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to append to global credentials: %w", err)
 	}
 
 	credentials, err := s.credRepo.GetAllGlobalCredentials(ctx)
-	if err != nil && errors.Is(err, redis.Nil) {
+	if err != nil && !errors.Is(err, redis.Nil) {
 		return nil, nil, nil, fmt.Errorf("failed to retrieve global credentials: %w", err)
 	}
 
-	// TODO: storing hexed or encoded credentials and then decode them, refer to commented snippet below
 	var data [][]byte
 	for _, credential := range credentials {
 		data = append(data, []byte(credential))
 	}
-
-	// data := make([][]byte, 0, len(credentials))
-	// for _, cHex := range credentials {
-	// 	cBytes, decodeErr := hex.DecodeString(cHex)
-	// 	if decodeErr != nil {
-	// 		log.Printf("Skipping invalid hex credential %q: %v", cHex, decodeErr)
-	// 		continue
-	// 	}
-	// 	data = append(data, cBytes)
-	// }
 
 	tree, err := merkletree.NewUsing(data, keccak256.New(), []byte{})
 	if err != nil {
@@ -100,25 +81,30 @@ func (s *MerkleTreeService) WithNewCredential(newCredential string) (*merkletree
 	}
 
 	prevRecentNode, err := s.credRepo.GetMostRecentMerkleNode(ctx)
-	if err != nil && errors.Is(err, redis.Nil) {
+	if err != nil && !errors.Is(err, redis.Nil) {
 		return nil, nil, nil, fmt.Errorf("failed to get most recent merkle node: %w", err)
 	}
 
-	var prevRoot []byte
-	if prevRecentNode != nil {
-		prevRoot = prevRecentNode.TreeRoot
+	var proofHashes []string
+	for _, proofHash := range proof.Hashes {
+		proofHashes = append(proofHashes, hex.EncodeToString(proofHash))
+	}
+
+	prevRecentRoot := ""
+	if prevRecentNode != nil && len(prevRecentNode.TreeRoot) != 0 {
+		prevRecentRoot = prevRecentNode.TreeRoot
 	}
 
 	newNode := &repository.MerkleNode{
-		ID:           uuid.New().String(),
-		NodeType:     repository.Credential,
-		Hash:         newCredential,
-		ProofIndex:   proofIndex,
-		ProofHashes:  proof.Hashes,
-		TreeRoot:     tree.Root(),
-		PrevRoot:     prevRoot,
-		CreatedAt:    time.Now(),
-		CredentialID: newCredential,
+		ID:               uuid.New().String(),
+		NodeType:         repository.Credential,
+		Hash:             newCredential,
+		Position:         proof.Index,
+		ProofHashes:      proofHashes,
+		TreeRoot:         tree.String(),
+		PrevRoot:         prevRecentRoot,
+		CreatedAt:        time.Now(),
+		ActualCredential: newCredential,
 	}
 
 	return tree, newNode, proof, nil
@@ -132,22 +118,15 @@ func (s *MerkleTreeService) GetMerkleTree() (*merkletree.MerkleTree, int, error)
 	}
 
 	var data [][]byte
-	for _, credential := range credentials {
-		data = append(data, []byte(credential))
+	for _, cHex := range credentials {
+		cBytes, decodeErr := hex.DecodeString(cHex)
+		if decodeErr != nil {
+			log.Printf("Skipping invalid hex credential %q: %v", cHex, decodeErr)
+			continue
+		}
+		data = append(data, cBytes)
 	}
 
-	// TODO
-	// data := make([][]byte, 0, len(credentials))
-	// for _, cHex := range credentials {
-	// 	cBytes, decodeErr := hex.DecodeString(cHex)
-	// 	if decodeErr != nil {
-	// 		log.Printf("Skipping invalid hex credential %q: %v", cHex, decodeErr)
-	// 		continue
-	// 	}
-	// 	data = append(data, cBytes)
-	// }
-
-	// build tree
 	tree, err := merkletree.NewUsing(data, keccak256.New(), []byte{})
 	if err != nil {
 		return nil, 0, err
@@ -157,10 +136,66 @@ func (s *MerkleTreeService) GetMerkleTree() (*merkletree.MerkleTree, int, error)
 	return tree, len(credentials), nil
 }
 
-func hashCredential(cred string) []byte {
+func HashCredential(cred string) string {
 	salt := []byte{0x1c, 0x9d, 0x3c, 0x4f}
 	h := keccak256.New()
 	credHash := h.Hash([]byte(cred))
 	saltedHash := h.Hash(append(credHash, salt...))
-	return saltedHash
+	return hex.EncodeToString(saltedHash)
+}
+
+func (s *MerkleTreeService) GenerateTree(nCredential string) (*repository.Tree, error) {
+	err := s.credRepo.AddGlobalCredential(context.Background(), hex.EncodeToString([]byte(nCredential)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to append to global credentials: %w", err)
+	}
+
+	credentials, err := s.credRepo.GetAllGlobalCredentials(context.Background())
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return nil, fmt.Errorf("failed to retrieve global credentials: %w", err)
+	}
+
+	var data [][]byte
+	for _, credential := range credentials {
+		hexCredential, err := hex.DecodeString(credential)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode credential: %w", err)
+		}
+
+		data = append(data, hexCredential)
+	}
+
+	tree, err := merkletree.NewUsing(data, keccak256.New(), []byte{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to build Merkle tree: %w", err)
+	}
+
+	proofIndex := uint64(len(data) - 1)
+	proof, err := tree.GenerateProof(data[proofIndex])
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate proof: %w", err)
+	}
+
+	prevRecentNode, err := s.credRepo.RecentMerkleNode(context.Background())
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return nil, fmt.Errorf("failed to get most recent merkle node: %w", err)
+	}
+
+	var proofHashes []string
+	for _, proofHash := range proof.Hashes {
+		proofHashes = append(proofHashes, hex.EncodeToString(proofHash))
+	}
+
+	prevRecentRoot := ""
+	if prevRecentNode != nil {
+		prevRecentRoot = prevRecentNode.Tree.Root
+	}
+
+	return &repository.Tree{
+		Leaf:          nCredential,
+		Index:         proof.Index,
+		ProofElements: proofHashes,
+		Root:          hex.EncodeToString(tree.Root()),
+		PrevRoot:      prevRecentRoot,
+	}, nil
 }

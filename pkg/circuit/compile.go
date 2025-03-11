@@ -1,7 +1,9 @@
 package circuit
 
 import (
-	"os"
+	"fmt"
+	"math/big"
+	"strconv"
 
 	"keyless-auth/domain"
 
@@ -16,45 +18,58 @@ var (
 	MAX_DEPTH = 256
 )
 
-func Compile() (*groth16.ProvingKey, constraint.ConstraintSystem, error) {
-	var ckt ZKAuthCircuit
-	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &ckt)
+func GenerateGroth16(assignment *ZKAuthCircuit) (constraint.ConstraintSystem, *groth16.ProvingKey, *groth16.VerifyingKey, error) {
+	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, assignment)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	pk := groth16.NewProvingKey(ecc.BN254)
-	{
-		f, err := os.Open("mt.g16.pk")
-		if err != nil {
-			return nil, nil, err
-		}
-		_, err = pk.ReadFrom(f)
-		if err != nil {
-			return nil, nil, err
-		}
-		f.Close()
+	pk, vk, err := groth16.Setup(r1cs)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	return &pk, r1cs, nil
+	return r1cs, &pk, &vk, nil
+}
+
+func helper(val string) (*big.Int, error) {
+	bigVal, ok := new(big.Int).SetString(val, 16)
+	if !ok {
+		fmt.Errorf("failed to parse %s", val)
+	}
+	return bigVal, nil
 }
 
 func CompileCircuit(proof domain.Proof) (*groth16.Proof, error) {
-	pk, r1cs, err := Compile()
-	if err != nil {
-		return nil, err
+	leaf, err := helper(proof.Leaf)
+	root, err := helper(proof.Root)
+
+	s1, s2 := new(big.Int), new(big.Int)
+
+	for _, sibling := range proof.Siblings {
+		s1, err = helper("0x" + strconv.Itoa(int(sibling[0])))
+		if err != nil {
+			return nil, err
+		}
+		s2, err = helper("0x" + strconv.Itoa(int(sibling[0])))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	assignment := ZKAuthCircuit{
-		Leaf:          frontend.Variable(proof.Leaf),
-		Root:          frontend.Variable(proof.Root),
+		Leaf:          frontend.Variable(leaf),
+		Root:          frontend.Variable(root),
 		ProofElements: make([]frontend.Variable, len(proof.Siblings)),
-		ProofIndex:    frontend.Variable(proof.Positions),
+		ProofIndex:    frontend.Variable(proof.Position),
 	}
 
-	for i := 0; i < len(proof.Siblings); i++ {
-		assignment.ProofElements[i] = frontend.Variable(proof.Siblings[i])
+	assignment.ProofElements[0] = s1
+	assignment.ProofElements[1] = s2
+
+	r1cs, pk, _, err := GenerateGroth16(&assignment)
+	if err != nil {
+		return nil, err
 	}
-	assignment.ProofIndex = frontend.Variable(1)
 
 	witness, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
 	if err != nil {

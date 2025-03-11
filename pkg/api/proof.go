@@ -2,19 +2,20 @@ package api
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"keyless-auth/circuit"
 	"keyless-auth/domain"
 	"keyless-auth/repository"
-	"net/http"
 
 	"github.com/consensys/gnark/backend/groth16"
 )
 
 type ProofRequest struct {
-	Leaf      string   `json:"leaf"`      // Leaf hash
-	Root      string   `json:"root"`      // Merkle root
-	Siblings  []string `json:"siblings"`  // Sibling hashes
-	Positions []int    `json:"positions"` // Positions (0 = left, 1 = right)
+	Leaf     string   `json:"leaf"`     // Leaf hash
+	Root     string   `json:"root"`     // Merkle root
+	Siblings []string `json:"siblings"` // Sibling hashes
+	Position int      `json:"position"` // Position (0 = left, 1 = right)
 }
 
 type ProofResponse struct {
@@ -39,10 +40,10 @@ func (h *ProofHandler) GenerateProof(w http.ResponseWriter, r *http.Request) {
 	}
 
 	proof, err := circuit.CompileCircuit(domain.Proof{
-		Leaf:      req.Leaf,
-		Root:      req.Root,
-		Siblings:  req.Siblings,
-		Positions: req.Positions,
+		Leaf:     "0x" + req.Leaf,
+		Root:     "0x" + req.Root,
+		Siblings: req.Siblings,
+		Position: req.Position,
 	})
 	if err != nil {
 		http.Error(w, "Failed to compile circuit", http.StatusInternalServerError)

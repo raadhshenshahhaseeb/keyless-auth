@@ -64,6 +64,7 @@ func main() {
 	router.HandleFunc("/credentials", credentialsHandler.GenerateCredential).Methods("POST")
 	router.HandleFunc("/merkle-root", credentialsHandler.GetMerkleRoot).Methods("GET")
 	router.HandleFunc("/merkle-proof/{credential}", credentialsHandler.GenerateMerkleProof).Methods("GET")
+	router.HandleFunc("/generate-tree-object", credentialsHandler.GenerateTreeObject).Methods("POST")
 	// zk proof
 	router.HandleFunc("/proof", proofHandler.GenerateProof).Methods("POST")
 	// auth
