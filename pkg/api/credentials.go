@@ -2,17 +2,18 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/wealdtech/go-merkletree"
 
 	"keyless-auth/repository"
+	"keyless-auth/repository/user"
 	"keyless-auth/service"
 )
 
@@ -26,6 +27,7 @@ type GenerateTreeResponse struct {
 
 type CredentialRequest struct {
 	HashedCredential string `json:"hashed_credential"`
+	UserID           string `json:"user_id"`
 }
 
 type CredentialResponse struct {
@@ -46,11 +48,12 @@ type MerkleProofResponse struct {
 
 type CredentialsHandler struct {
 	credRepo   *repository.CredentialsRepository
-	walletRepo *repository.WalletRepository
 	merkleTree *service.MerkleTreeService
+	userRepo   user.Repo
+	walletRepo repository.WalletRepository
 }
 
-func NewCredentialsHandler(credRepo *repository.CredentialsRepository, walletRepo *repository.WalletRepository) *CredentialsHandler {
+func NewCredentialsHandler(credRepo *repository.CredentialsRepository, walletRepo repository.WalletRepository) *CredentialsHandler {
 	return &CredentialsHandler{
 		credRepo:   credRepo,
 		walletRepo: walletRepo,
@@ -58,37 +61,32 @@ func NewCredentialsHandler(credRepo *repository.CredentialsRepository, walletRep
 	}
 }
 
-func (h *CredentialsHandler) GetMerkleRoot(w http.ResponseWriter, r *http.Request) {
-	tree, numLeaves, err := h.merkleTree.GetMerkleTree()
-	if err != nil {
-		http.Error(w, "Failed to get merkle root", http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(MerkleRootResponse{
-		MerkleRoot: "0x" + hex.EncodeToString(tree.Root()),
-		NumLeaves:  numLeaves,
-	})
-}
-
 func (h *CredentialsHandler) GenerateMerkleProof(w http.ResponseWriter, r *http.Request) {
 	credential := mux.Vars(r)["credential"]
 	// TODO: with existing credential
-	tree, node, proof, err := h.merkleTree.WithNewCredential(credential)
+	treeObj, err := h.merkleTree.GenerateTree(credential)
 	if err != nil {
 		http.Error(w, "failed to generate merkle proof", http.StatusInternalServerError)
 		return
 	}
 
-	// "SaveCredentialAndNode" if you want to store the root. We can also store node only.
-	err = h.credRepo.SaveCredentialAndNode(context.Background(), credential, hex.EncodeToString(tree.Root()), node)
+	err = h.credRepo.SaveCredentialAndNode(context.Background(), credential, treeObj.Root, &repository.MerkleNode{
+		ID:          uuid.New().String(),
+		Hash:        treeObj.Leaf,
+		Position:    treeObj.Index,
+		ProofHashes: treeObj.ProofElements,
+		TreeRoot:    treeObj.Root,
+		PrevRoot:    treeObj.PrevRoot,
+		CreatedAt:   time.Now(),
+	})
 	if err != nil {
-		log.Println("failed to store credential and node: ", err)
-		http.Error(w, "failed to store credential and node", http.StatusInternalServerError)
+		log.Println("failed to storage credential and node: ", err)
+		http.Error(w, "failed to storage credential and node", http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(MerkleProofResponse{
-		Proof: proof,
+		Proof: treeObj.Proof,
 	})
 }
 
@@ -108,6 +106,18 @@ func (h *CredentialsHandler) GenerateCredential(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// check if user exists
+	exists, err := h.userRepo.GetUserByID(req.UserID)
+	if err != nil {
+		http.Error(w, "unable to process user", http.StatusInternalServerError)
+		return
+	}
+
+	if !exists {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
 	// check if credential already exists
 	if exists, err := h.credRepo.Exists(req.HashedCredential); err != nil || exists {
 		// TODO: better return 200 with message to fetch the wallet address or credential on a different endpoint
@@ -115,71 +125,57 @@ func (h *CredentialsHandler) GenerateCredential(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// generate wallet address
-	walletAddress, privKey, err := GenerateWalletAddress()
-	if err != nil {
-		http.Error(w, "Failed to generate wallet address", http.StatusInternalServerError)
-		return
-	}
-
-	tree, node, proof, err := h.merkleTree.WithNewCredential(req.HashedCredential)
+	treeObj, err := h.merkleTree.GenerateTree(req.HashedCredential)
 	if err != nil {
 		http.Error(w, "Failed to generate merkle tree root", http.StatusInternalServerError)
 		return
 	}
 
-	// "SaveCredentialAndNode" if you want to store the root. We can also store node only.
-	err = h.credRepo.SaveCredentialAndNode(context.Background(), node.ActualCredential, tree.String(), node)
+	nodeObj := &repository.MerkleNode{
+		ID:          uuid.New().String(),
+		Hash:        treeObj.Leaf,
+		Position:    treeObj.Index,
+		ProofHashes: treeObj.ProofElements,
+		TreeRoot:    treeObj.Root,
+		PrevRoot:    treeObj.PrevRoot,
+		CreatedAt:   time.Now(),
+	}
+
+	// "SaveCredentialAndNode" if you want to storage the root. We can also storage node only.
+	err = h.credRepo.SaveCredentialAndNode(context.Background(), treeObj.Leaf, treeObj.Root, nodeObj)
 	if err != nil {
-		log.Println("failed to store credential and node: ", err)
-		http.Error(w, "failed to store credential and node", http.StatusInternalServerError)
+		log.Println("failed to storage credential and node: ", err)
+		http.Error(w, "failed to storage credential and node", http.StatusInternalServerError)
 		return
 	}
 
-	err = h.credRepo.SetMostRecentMerkleNode(context.Background(), node)
+	err = h.credRepo.SetMostRecentMerkleNode(context.Background(), nodeObj)
 	if err != nil {
-		log.Println("failed to store recent node: ", err)
-		http.Error(w, "failed to store recent node", http.StatusInternalServerError)
-		return
-	}
-
-	// store wallet
-	if err := h.walletRepo.Save(walletAddress, privKey, node.Hash, tree.String()); err != nil {
-		log.Printf("Failed to save wallet: %v", err)
-		http.Error(w, "Failed to save wallet", http.StatusInternalServerError)
+		log.Println("failed to storage recent node: ", err)
+		http.Error(w, "failed to storage recent node", http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(CredentialResponse{
-		MerkleRoot:    tree.String(),
-		WalletAddress: walletAddress,
-		Proof:         proof,
-		Leaf:          node.Hash,
+		MerkleRoot:    treeObj.Root,
+		WalletAddress: "",
+		Proof:         treeObj.Proof,
+		Leaf:          treeObj.Leaf,
 	})
 }
 
-func (h *CredentialsHandler) GetWalletByCredential(w http.ResponseWriter, r *http.Request) {
-	credential := mux.Vars(r)["credential"]
-
-	wallet, err := h.walletRepo.GetWalletByCredential(credential)
+func (h *CredentialsHandler) GetMerkleRoot(w http.ResponseWriter, r *http.Request) {
+	node, err := h.credRepo.GetMostRecentMerkleNode(context.Background())
 	if err != nil {
-		http.Error(w, "Failed to get wallet", http.StatusInternalServerError)
+		log.Println("failed to fetch recent node: ", err)
+		http.Error(w, "failed to fetch recent node", http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(CredentialResponse{MerkleRoot: wallet.MerkleRoot})
-}
-
-func (h *CredentialsHandler) GetWalletIfExists(w http.ResponseWriter, r *http.Request) {
-	credential := mux.Vars(r)["credential"]
-
-	wallet, err := h.walletRepo.GetWalletByCredential(credential)
-	if err != nil {
-		http.Error(w, "Failed to get wallet", http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(CredentialResponse{MerkleRoot: wallet.MerkleRoot})
+	json.NewEncoder(w).Encode(MerkleRootResponse{
+		MerkleRoot: node.TreeRoot,
+		NumLeaves:  len(node.ProofHashes),
+	})
 }
 
 func (h *CredentialsHandler) GenerateTreeObject(w http.ResponseWriter, r *http.Request) {
@@ -217,8 +213,8 @@ func (h *CredentialsHandler) GenerateTreeObject(w http.ResponseWriter, r *http.R
 
 	err = h.credRepo.AddToTree(context.Background(), object)
 	if err != nil {
-		log.Println("failed to store credential and node: ", err)
-		http.Error(w, "failed to store credential and node", http.StatusInternalServerError)
+		log.Println("failed to storage credential and node: ", err)
+		http.Error(w, "failed to storage credential and node", http.StatusInternalServerError)
 		return
 	}
 

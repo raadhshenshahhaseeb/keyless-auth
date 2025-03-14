@@ -6,13 +6,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/redis/go-redis/v9"
 
 	"keyless-auth/api"
 	"keyless-auth/repository"
-	"keyless-auth/storage"
+	"keyless-auth/repository/user"
+	"keyless-auth/service/signer"
+	"keyless-auth/services"
 )
 
 var (
@@ -38,7 +41,7 @@ func init() {
 }
 
 func main() {
-	db, err := storage.NewRedisClient(context.Background(), &redis.Options{
+	db, err := services.NewRedisClient(context.Background(), &redis.Options{
 		Username: redisUsername,
 		Addr:     redisHost + ":" + redisPort,
 		Password: redisPassword,
@@ -48,19 +51,22 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer db.Client.Close()
+
+	newSigner, _ := signer.New()
+	sessionStore := api.NewSessionStore(10 * time.Minute)
 
 	walletRepo := repository.NewWalletRepository(db)
 	credentialsRepo := repository.NewCredentialsRepository(db)
 	proofHandler := api.NewProofHandler(walletRepo)
 	credentialsHandler := api.NewCredentialsHandler(credentialsRepo, walletRepo)
-	userRepo := repository.NewUserRepository(db)
+	userRepo := user.NewUser(db)
 	googleHandler := api.NewGoogleHandler(userRepo)
+	challengeHandler := api.NewChallengeHandler(newSigner, db, userRepo, sessionStore)
 
 	router := mux.NewRouter()
 
 	// credentials
-	router.HandleFunc("/credentials/{credential}", credentialsHandler.GetWalletByCredential).Methods("GET")
 	router.HandleFunc("/credentials", credentialsHandler.GenerateCredential).Methods("POST")
 	router.HandleFunc("/merkle-root", credentialsHandler.GetMerkleRoot).Methods("GET")
 	router.HandleFunc("/merkle-proof/{credential}", credentialsHandler.GenerateMerkleProof).Methods("GET")
@@ -71,7 +77,9 @@ func main() {
 	router.HandleFunc("/auth/google/login", googleHandler.HandleGoogleLogin).Methods("GET")
 	router.HandleFunc("/auth/google/callback", googleHandler.HandleGoogleCallback).Methods("GET")
 
-	serverAddr := fmt.Sprintf(":%s", getEnvOrDefault("APP_PORT", "8080"))
+	router.HandleFunc("/challenge", challengeHandler.SendChallengeHandler).Methods("POST")
+	router.HandleFunc("/challenge/verify", challengeHandler.VerifyChallengeHandler).Methods("POST")
+	serverAddr := fmt.Sprintf(":%s", getEnvOrDefault("APP_PORT", "8081"))
 	log.Printf("Server starting on %s", serverAddr)
 	log.Fatal(http.ListenAndServe(serverAddr, router))
 }

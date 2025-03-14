@@ -23,10 +23,10 @@ type ProofResponse struct {
 }
 
 type ProofHandler struct {
-	walletRepo *repository.WalletRepository
+	walletRepo repository.WalletRepository
 }
 
-func NewProofHandler(walletRepo *repository.WalletRepository) *ProofHandler {
+func NewProofHandler(walletRepo repository.WalletRepository) *ProofHandler {
 	return &ProofHandler{
 		walletRepo: walletRepo,
 	}

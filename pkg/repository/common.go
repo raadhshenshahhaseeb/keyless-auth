@@ -7,40 +7,16 @@ import (
 	"github.com/wealdtech/go-merkletree"
 )
 
-type NodeType int
-
-const (
-	Root NodeType = iota
-	SubRoot
-	Credential
-	Proof
-)
-
 // MerkleNode describes a single node in the Merkle tree.
 type MerkleNode struct {
-	ID               string // e.g. a UUID
-	NodeType         NodeType
-	Hash             string // Hash of this leaf/node
-	Position         uint64
-	ProofHashes      []string
-	TreeRoot         string // Merkle root after insertion
-	PrevRoot         string // Optional: the previous root
-	CreatedAt        time.Time
-	ActualCredential string // which credential this node belongs to
-}
-
-var NodeTypeNames = map[NodeType]string{
-	Root:       "root",
-	SubRoot:    "sroot",
-	Credential: "credential",
-	Proof:      "proof",
-}
-
-func (t NodeType) String() string {
-	if name, ok := NodeTypeNames[t]; ok {
-		return name
-	}
-	return fmt.Sprintf("Unknown NodeType (%d)", t)
+	ID          string // e.g. a UUID
+	Hash        string // Hash of this leaf/node
+	Position    uint64
+	ProofHashes []string
+	TreeRoot    string // Merkle root after insertion
+	PrevRoot    string // Optional: the previous root
+	CreatedAt   time.Time
+	UID         string // which user this node belongs to
 }
 
 // -----------------TODO
@@ -66,11 +42,12 @@ type Object struct {
 }
 
 type Tree struct {
-	Leaf          string   `json:"leaf"` // leaf is the credential
-	Index         uint64   `json:"index"`
-	ProofElements []string `json:"proof_elements"`
-	Root          string   `json:"root"`      // Merkle root after insertion
-	PrevRoot      string   `json:"prev_root"` // Optional: the previous root
+	Leaf          string            `json:"leaf"` // leaf is the credential
+	Index         uint64            `json:"index"`
+	ProofElements []string          `json:"proof_elements"`
+	Root          string            `json:"root"`      // Merkle root after insertion
+	PrevRoot      string            `json:"prev_root"` // Optional: the previous root
+	Proof         *merkletree.Proof `json:"proof"`
 }
 
 type User struct {

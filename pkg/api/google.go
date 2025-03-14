@@ -4,21 +4,22 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"keyless-auth/domain"
-	"keyless-auth/repository"
 	"net/http"
 	"os"
 
+	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+
+	"keyless-auth/repository/user"
 )
 
 type GoogleHandler struct {
 	oauthConfig *oauth2.Config
-	repository  *repository.UserRepository
+	repository  user.Repo
 }
 
-func NewGoogleHandler(repo *repository.UserRepository) *GoogleHandler {
+func NewGoogleHandler(r user.Repo) *GoogleHandler {
 	config := &oauth2.Config{
 		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
@@ -33,7 +34,7 @@ func NewGoogleHandler(repo *repository.UserRepository) *GoogleHandler {
 
 	return &GoogleHandler{
 		oauthConfig: config,
-		repository:  repo,
+		repository:  r,
 	}
 }
 
@@ -83,18 +84,62 @@ func (h *GoogleHandler) HandleGoogleCallback(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	user := &domain.User{
-		ID:           userInfo.ID,
-		Email:        userInfo.Email,
-		Name:         userInfo.Name,
-		AccessToken:  token.AccessToken,
-		RefreshToken: token.RefreshToken,
+	userObj := &user.OAuthUser{
+		ID:             uuid.New().String(),
+		GoogleID:       userInfo.ID,
+		Email:          userInfo.Email,
+		Name:           userInfo.Name,
+		ProfilePicture: "",
+		AccessToken:    token.AccessToken,
+		RefreshToken:   token.RefreshToken,
 	}
 
-	if err := h.repository.SaveUser(user); err != nil {
+	if err := h.repository.SaveoAuthUser(userObj); err != nil {
 		http.Redirect(w, r, "/auth/failure", http.StatusTemporaryRedirect)
 		return
 	}
 
 	http.Redirect(w, r, "/auth/success", http.StatusTemporaryRedirect)
+}
+
+// WithGoogle TODO: google
+type WithGoogle struct {
+	ID             string `json:"id"`
+	GoogleID       string `json:"google_id"`
+	Email          string `json:"email"`
+	Name           string `json:"name"`
+	ProfilePicture string `json:"profile_picture"`
+	AccessToken    string `json:"-"`
+	RefreshToken   string `json:"-"`
+}
+
+type WithMetamask struct {
+}
+
+// TODO metamask
+type WithNFC struct{}
+
+// TODO: NCF
+
+// WithKeyExchange is a simple key exchange to generate a shared key.
+type WithKeyExchange struct {
+	PublicKey string `json:"public_key"`
+	Challenge string `json:"challenge"`
+}
+
+type WithKeyExchangeResponse struct {
+	HashedKey       string `json:"hashed_key"`
+	HashedSignature string `json:"hashed_signature"`
+}
+
+type KeyExchangeLoginRequest struct {
+	PublicKey string `json:"public_key"`
+}
+
+type KeyExchangeLoginByChallengeResponse struct {
+	HashedKey string `json:"hashed_key"`
+}
+
+type KeyExchangeLoginBySignatureResponse struct {
+	Signature string `json:"signature"`
 }

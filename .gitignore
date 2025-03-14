@@ -29,3 +29,4 @@ ignition/deployments/chain-31337
 pkg/testHashes.json
 pkg/helper.go
 ~
+nohup.out

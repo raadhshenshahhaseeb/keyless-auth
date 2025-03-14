@@ -9,15 +9,15 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"keyless-auth/storage"
+	"keyless-auth/services"
 )
 
 // CredentialsRepository manages credential<->wallet<->user data.
 type CredentialsRepository struct {
-	db *storage.Redis
+	db *services.RedisClient
 }
 
-func NewCredentialsRepository(db *storage.Redis) *CredentialsRepository {
+func NewCredentialsRepository(db *services.RedisClient) *CredentialsRepository {
 	return &CredentialsRepository{db: db}
 }
 
@@ -76,7 +76,7 @@ func (r *CredentialsRepository) SaveMerkleNode(
 
 	nodesKey := fmt.Sprintf("merkle:credential:%s:nodes", credentialID)
 	if err := r.db.Client.RPush(ctx, nodesKey, nodeJSON).Err(); err != nil {
-		return fmt.Errorf("failed to store MerkleNode in Redis: %w", err)
+		return fmt.Errorf("failed to storage MerkleNode in Redis: %w", err)
 	}
 
 	return nil
@@ -193,7 +193,7 @@ func (r *CredentialsRepository) SetMostRecentMerkleNode(ctx context.Context, nod
 
 	key := "merkle:global:nodes"
 	if err := r.db.Client.RPush(ctx, key, nodeJSON).Err(); err != nil {
-		return fmt.Errorf("failed to store MerkleNode in Redis: %w", err)
+		return fmt.Errorf("failed to storage MerkleNode in Redis: %w", err)
 	}
 
 	return nil
@@ -266,7 +266,7 @@ func (r *CredentialsRepository) AddSingleCredentialToWallet(
 }
 
 // SetCredentialsForWallet is the "setter" method to overwrite a wallet’s credential list
-// with a new collection, in order. (Example usage: if you want to store multiple at once.)
+// with a new collection, in order. (Example usage: if you want to storage multiple at once.)
 // This is for future reference.
 func (r *CredentialsRepository) SetCredentialsForWallet(
 	ctx context.Context,

@@ -2,9 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/sha3"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,73 +12,7 @@ import (
 )
 
 func main() {
-	HG()
 	RG()
-}
-func HG() {
-	hashes, err := GenerateSHAKE256Hashes(20)
-	if err != nil {
-		log.Fatalf("Error generating SHAKE256 hashes: %v\n", err)
-	}
-
-	var Hashes []map[string]string
-
-	for i, hash := range hashes {
-		// Append to the 'Hashes' field (which is a slice),
-		// not to the 'result' struct itself.
-		Hashes = append(Hashes, map[string]string{
-			"index": fmt.Sprintf("%d", i),
-			"hash":  hash,
-		})
-	}
-
-	// Marshal to pretty-printed JSON
-	output, _ := json.MarshalIndent(hashes, "", "  ")
-	fileName := "shake256_hlist.json"
-
-	f, err := os.Create(fileName)
-	if err != nil {
-		log.Fatalf("Error creating file %s: %v\n", fileName, err)
-	}
-
-	defer f.Close()
-
-	if _, err := f.Write(output); err != nil {
-		log.Fatalf("Error writing JSON to file %s: %v\n", fileName, err)
-	}
-
-	fmt.Printf("JSON output successfully written to %s\n", fileName)
-}
-
-// GenerateSHAKE256Hashes creates N random 32-byte buffers,
-// then derives a 32-byte SHAKE256 digest for each, returning them as hex strings.
-func GenerateSHAKE256Hashes(count int) ([]string, error) {
-	hashes := make([]string, 0, count)
-	for i := 0; i < count; i++ {
-		// Create random input data (32 bytes is arbitrary; you can use any size)
-		data := make([]byte, 32)
-		if _, err := rand.Read(data); err != nil {
-			return nil, err
-		}
-
-		// Create a SHAKE256 hasher
-		shake := sha3.NewSHAKE256()
-
-		// Write the random data
-		if _, err := shake.Write(data); err != nil {
-			return nil, err
-		}
-
-		// Read 32 bytes (256 bits) out of the shake stream
-		digest := make([]byte, 32)
-		if _, err := shake.Read(digest); err != nil {
-			return nil, err
-		}
-
-		// Convert to hex
-		hashes = append(hashes, hex.EncodeToString(digest))
-	}
-	return hashes, nil
 }
 
 func RG() {
@@ -149,7 +80,7 @@ func RG() {
 		// so we don't get escaped strings in the final file
 		var parsed interface{}
 		if err := json.Unmarshal(respBody, &parsed); err != nil {
-			// If it's not valid JSON, we’ll just store the raw string
+			// If it's not valid JSON, we’ll just storage the raw string
 			parsed = string(respBody)
 		}
 
