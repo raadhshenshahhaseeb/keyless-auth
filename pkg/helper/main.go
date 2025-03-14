@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 )
 
+// TODO will move to test
 func main() {
 	RG()
 }
@@ -18,13 +19,11 @@ func main() {
 func RG() {
 	jsonPath := filepath.Join("shake256_hlist.json")
 
-	// 1) Read the file's contents
 	data, err := os.ReadFile(jsonPath)
 	if err != nil {
 		log.Fatalf("Error reading JSON file: %v", err)
 	}
 
-	// 2) Unmarshal into a slice of strings (your keccak hashes)
 	var contents []string
 	if err := json.Unmarshal(data, &contents); err != nil {
 		log.Fatalf("Error unmarshaling JSON: %v", err)
@@ -69,32 +68,25 @@ func RG() {
 			continue
 		}
 
-		// We must close the body *after* reading it
 		respBody, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 
-		// (Optional) print to stdout for debugging
 		fmt.Printf("Response for hash %q:\n%s\n", hashStr, string(respBody))
 
-		// Attempt to parse the server response as JSON
-		// so we don't get escaped strings in the final file
 		var parsed interface{}
 		if err := json.Unmarshal(respBody, &parsed); err != nil {
 			// If it's not valid JSON, we’ll just storage the raw string
 			parsed = string(respBody)
 		}
 
-		// Build a single entry that includes the hash and the parsed response
 		entry := map[string]interface{}{
 			"hash":     hashStr,
 			"response": parsed,
 		}
 
-		// Append this entry to our master slice
 		allResults = append(allResults, entry)
 	}
 
-	// 4) After the loop, write one big JSON array to "response.json"
 	fileName := "response.json"
 	output, err := json.MarshalIndent(allResults, "", "  ")
 	if err != nil {
