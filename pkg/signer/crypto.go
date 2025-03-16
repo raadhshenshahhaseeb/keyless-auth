@@ -47,9 +47,10 @@ func (signerObject *signer) EncryptAndGetChallengeHash(key string, message strin
 	if _, err := hasher.Write([]byte(key)); err != nil {
 		return "", "", fmt.Errorf("error hashing key: %w", err)
 	}
-	challengeHash := hasher.Sum(nil)
 
-	return hex.EncodeToString(challengeHash), hex.EncodeToString(combined), nil
+	hashedEphemeralKey := hasher.Sum(nil)
+
+	return hex.EncodeToString(hashedEphemeralKey), hex.EncodeToString(combined), nil
 }
 
 // DecryptMessage using sharedKey, ciphered text and the nonce used to encrypt it.

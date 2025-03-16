@@ -79,3 +79,25 @@ func New() (Signer, error) {
 		Address:    &address,
 	}, nil
 }
+
+func NewFromKey(hexedPvtKey string) (Signer, error) {
+	privateKey, err := crypto.HexToECDSA(hexedPvtKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a signer: %w", err)
+	}
+
+	publicKey := privateKey.Public()
+
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("failed to create a child from signer: %w", err)
+	}
+
+	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
+
+	return &signer{
+		PublicKey:  publicKeyECDSA,
+		PrivateKey: privateKey,
+		Address:    &address,
+	}, nil
+}

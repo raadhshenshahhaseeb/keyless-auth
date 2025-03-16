@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
 
-	"keyless-auth/service/signer/signerMock"
+	"keyless-auth/signer/signerMock"
 )
 
 func DefaultMockOptions(t *testing.T) []signerMock.Option {
@@ -180,6 +180,11 @@ func TestEncryptAndDecryptChallenge(t *testing.T) {
 	}
 	s := &signer{PrivateKey: privKey}
 
+	pubkeyStr := hex.EncodeToString(crypto.FromECDSAPub(&privKey.PublicKey))
+	privKeyStr := hex.EncodeToString(crypto.FromECDSA(privKey))
+
+	fmt.Println("pubKeyStr:", pubkeyStr)
+	fmt.Println("privKeyStr:", privKeyStr)
 	// Create a random shared key (simulate the ECDH-derived shared key).
 	sharedKeyBytes := make([]byte, 32)
 	if _, err := rand.Read(sharedKeyBytes); err != nil {
@@ -235,4 +240,34 @@ func TestEncryptAndDecryptChallenge(t *testing.T) {
 	if challengeHash != expectedHash {
 		t.Fatalf("challenge hash mismatch; got '%s', want '%s'", challengeHash, expectedHash)
 	}
+}
+
+func TestWithPostman(t *testing.T) {
+	t.Parallel()
+	t.Run("postman", func(t *testing.T) {
+		t.Parallel()
+
+		theirPubKey := "044de4a1298d7dc09695a3f50ac75bc47963297a79ed72e518e9b51e2b14515e042b440168c8fff10a7ecccc446a59cf528825c9b8039ce9ac09c4e5eadaffea71"
+		_ = "04cc92aea26ad08c582e3d0b57d2d652646594472932de6b4b8828f6a0d5dde3f10f9accbf31303527d2caec36c1a910fe9ccd3aac1c7b55ad816f88f41ac0d6e2"
+		_ = "490c6f6ac8c68bca0f77134854fc06067badf0ed6907d11b459218a24f407b2f6d3affc7f606420e2891162ce61fd9ab5282b5bc950018495a4d0cef5f277cde"
+		_ = "2dc0a498f14122192fb487f6c6f88ef0c09f5670e0fcd78b225036bfef33e2ca"
+		challenge := "c2e2176f7898c064d217c21326410548d8ed9e50ea837bab97038eb39b9a55cae9bc01dc718931f433ef703763c9fede1fd058483c026316010a711937d65fa9"
+		privKey := "3c31f2be3b9cd58421e99997f52098374a2ca1162185dac2de520eeda53bdeae"
+
+		s, _ := New()
+
+		_theirPubKey, _ := s.PublicKeyFromBytes(theirPubKey)
+		_privKey, _ := crypto.HexToECDSA(privKey)
+		_ = _privKey.Public()
+
+		// if !s.VerifySignature(*_theirPubKey, signature, hashedSignature) {
+		// 	t.Fatal("failed to verify signature")
+		// }
+
+		sharedKey, _ := _theirPubKey.Curve.ScalarMult(_theirPubKey.X, _theirPubKey.Y, _privKey.D.Bytes())
+		_sharedKey := hex.EncodeToString(sharedKey.Bytes())
+		decryptedMsg, _ := s.DecryptMessage(_sharedKey, challenge)
+
+		fmt.Println(decryptedMsg)
+	})
 }

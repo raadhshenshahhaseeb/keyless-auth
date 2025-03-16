@@ -22,7 +22,7 @@ func NewUser(db *services.RedisClient) Repo {
 type Repo interface {
 	GetUserByID(id string) (bool, error)
 
-	SavePubKeyUser(user *UserWithPubKey) error
+	SavePubKeyUser(ctx context.Context, user *UserWithPubKey) error
 	GetPubKeyUserWithID(id string) (*UserWithPubKey, error)
 
 	SaveoAuthUser(user *OAuthUser) error

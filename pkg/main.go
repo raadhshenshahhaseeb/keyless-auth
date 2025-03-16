@@ -6,16 +6,17 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/redis/go-redis/v9"
 
 	"keyless-auth/api"
+	_ "keyless-auth/api/docs"
 	"keyless-auth/repository"
+	"keyless-auth/repository/session"
 	"keyless-auth/repository/user"
-	"keyless-auth/service/signer"
 	"keyless-auth/services"
+	"keyless-auth/signer"
 )
 
 var (
@@ -54,15 +55,15 @@ func main() {
 	defer db.Client.Close()
 
 	newSigner, _ := signer.New()
-	sessionStore := api.NewSessionStore(10 * time.Minute)
 
 	walletRepo := repository.NewWalletRepository(db)
 	credentialsRepo := repository.NewCredentialsRepository(db)
 	proofHandler := api.NewProofHandler(walletRepo)
 	credentialsHandler := api.NewCredentialsHandler(credentialsRepo, walletRepo)
 	userRepo := user.NewUser(db)
+	sessionRepo := session.NewRedisSessionStore(db.Client)
 	googleHandler := api.NewGoogleHandler(userRepo)
-	challengeHandler := api.NewChallengeHandler(newSigner, db, userRepo, sessionStore)
+	challengeHandler := api.NewEphemeralHandler(newSigner, userRepo, sessionRepo)
 
 	router := mux.NewRouter()
 
@@ -77,8 +78,27 @@ func main() {
 	router.HandleFunc("/auth/google/login", googleHandler.HandleGoogleLogin).Methods("GET")
 	router.HandleFunc("/auth/google/callback", googleHandler.HandleGoogleCallback).Methods("GET")
 
-	router.HandleFunc("/challenge", challengeHandler.SendChallengeHandler).Methods("POST")
-	router.HandleFunc("/challenge/verify", challengeHandler.VerifyChallengeHandler).Methods("POST")
+	router.HandleFunc("/challenge", challengeHandler.ChallengeHandler).Methods("POST")
+	router.HandleFunc("/challenge/verify", challengeHandler.VerifyChallengeHandler).Methods("POST").GetHandler()
+
+	// docs
+	// router.HandleFunc("/api/docs/doc.json", func(w http.ResponseWriter, r *http.Request) {
+	// 	spec, err := docs.BuildOpenAPISpec(router)
+	// 	if err != nil {
+	// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 		return
+	// 	}
+	//
+	// 	w.Header().Set("Content-Type", "application/json")
+	// 	if err := json.NewEncoder(w).Encode(spec); err != nil {
+	// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	}
+	// })
+	//
+	// router.PathPrefix("/api/docs/").Handler(httpSwagger.Handler(
+	// 	httpSwagger.URL("/api/docs/doc.json"),
+	// ))
+
 	serverAddr := fmt.Sprintf(":%s", getEnvOrDefault("APP_PORT", "8081"))
 	log.Printf("Server starting on %s", serverAddr)
 	log.Fatal(http.ListenAndServe(serverAddr, router))
