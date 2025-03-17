@@ -9,15 +9,15 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"keyless-auth/storage"
+	"keyless-auth/services"
 )
 
 // CredentialsRepository manages credential<->wallet<->user data.
 type CredentialsRepository struct {
-	db *storage.Redis
+	db *services.RedisClient
 }
 
-func NewCredentialsRepository(db *storage.Redis) *CredentialsRepository {
+func NewCredentialsRepository(db *services.RedisClient) *CredentialsRepository {
 	return &CredentialsRepository{db: db}
 }
 
@@ -76,7 +76,7 @@ func (r *CredentialsRepository) SaveMerkleNode(
 
 	nodesKey := fmt.Sprintf("merkle:credential:%s:nodes", credentialID)
 	if err := r.db.Client.RPush(ctx, nodesKey, nodeJSON).Err(); err != nil {
-		return fmt.Errorf("failed to store MerkleNode in Redis: %w", err)
+		return fmt.Errorf("failed to storage MerkleNode in Redis: %w", err)
 	}
 
 	return nil
@@ -174,21 +174,29 @@ func (r *CredentialsRepository) GetAllGlobalCredentials(
 func (r *CredentialsRepository) GetMostRecentMerkleNode(ctx context.Context) (*MerkleNode, error) {
 	key := "merkle:global:nodes"
 
-	obj, err := r.db.Client.LRange(ctx, key, -1, -1).Result()
+	result, err := r.db.Client.LIndex(ctx, key, -1).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch the most recent node: %w", err)
 	}
-
-	if len(obj) == 0 {
-		return nil, errors.New("no nodes found")
-	}
-
 	var node MerkleNode
-	if err := json.Unmarshal([]byte(obj[0]), &node); err != nil {
+	if err := json.Unmarshal([]byte(result), &node); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal the most recent node: %w", err)
 	}
-
 	return &node, nil
+}
+
+func (r *CredentialsRepository) SetMostRecentMerkleNode(ctx context.Context, node *MerkleNode) error {
+	nodeJSON, err := json.Marshal(node)
+	if err != nil {
+		return fmt.Errorf("failed to marshal MerkleNode: %w", err)
+	}
+
+	key := "merkle:global:nodes"
+	if err := r.db.Client.RPush(ctx, key, nodeJSON).Err(); err != nil {
+		return fmt.Errorf("failed to storage MerkleNode in Redis: %w", err)
+	}
+
+	return nil
 }
 
 // --------------------- TODO---------------------------------------------
@@ -258,7 +266,7 @@ func (r *CredentialsRepository) AddSingleCredentialToWallet(
 }
 
 // SetCredentialsForWallet is the "setter" method to overwrite a wallet’s credential list
-// with a new collection, in order. (Example usage: if you want to store multiple at once.)
+// with a new collection, in order. (Example usage: if you want to storage multiple at once.)
 // This is for future reference.
 func (r *CredentialsRepository) SetCredentialsForWallet(
 	ctx context.Context,
@@ -328,4 +336,55 @@ func (r *CredentialsRepository) AddCredentialToUser(
 	}
 
 	return nil
+}
+
+// Test
+func (r *CredentialsRepository) AddToTree(
+	ctx context.Context,
+	obj *Object,
+) error {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	return r.db.Client.RPush(ctx, obj.Key(), data).Err()
+}
+
+func (r *CredentialsRepository) GetFromTree(
+	ctx context.Context,
+) ([]Object, error) {
+
+	var _obj Object
+	// Return them from index 0..-1, oldest to newest
+	obj, err := r.db.Client.LRange(ctx, _obj.Key(), -1, -1).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch objects for key: %s : %w", _obj.Key(), err)
+	}
+
+	var nodes []Object
+	for _, jsonStr := range obj {
+		var node Object
+		if err := json.Unmarshal([]byte(jsonStr), &node); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal node JSON: %w", err)
+		}
+		nodes = append(nodes, node)
+	}
+
+	return nodes, nil
+}
+
+func (r *CredentialsRepository) RecentMerkleNode(ctx context.Context) (*Object, error) {
+	obj := Object{}
+
+	key := obj.Key()
+
+	result, err := r.db.Client.LIndex(ctx, key, -1).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch the most recent node: %w", err)
+	}
+	var node Object
+	if err := json.Unmarshal([]byte(result), &node); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal the most recent node: %w", err)
+	}
+	return &node, nil
 }

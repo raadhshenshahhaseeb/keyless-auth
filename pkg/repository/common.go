@@ -7,46 +7,16 @@ import (
 	"github.com/wealdtech/go-merkletree"
 )
 
-// wallet address is mapped to a root
-// each root has l_sibling and r_sibling
-// r_sibling is always a credential or sub_root
-// l_sibling is always a proof
-// each root is always public
-
-type NodeType int
-
-const (
-	Root NodeType = iota
-	SubRoot
-	Credential
-	Proof
-)
-
 // MerkleNode describes a single node in the Merkle tree.
 type MerkleNode struct {
-	ID           string // e.g. a UUID
-	NodeType     NodeType
-	Hash         string // Hash of this leaf/node
-	ProofIndex   uint64
-	ProofHashes  [][]byte
-	TreeRoot     []byte // Merkle root after insertion
-	PrevRoot     []byte // Optional: the previous root
-	CreatedAt    time.Time
-	CredentialID string // which credential this node belongs to
-}
-
-var NodeTypeNames = map[NodeType]string{
-	Root:       "root",
-	SubRoot:    "sroot",
-	Credential: "credential",
-	Proof:      "proof",
-}
-
-func (t NodeType) String() string {
-	if name, ok := NodeTypeNames[t]; ok {
-		return name
-	}
-	return fmt.Sprintf("Unknown NodeType (%d)", t)
+	ID          string // e.g. a UUID
+	Hash        string // Hash of this leaf/node
+	Position    uint64
+	ProofHashes []string
+	TreeRoot    string // Merkle root after insertion
+	PrevRoot    string // Optional: the previous root
+	CreatedAt   time.Time
+	UID         string // which user this node belongs to
 }
 
 // -----------------TODO
@@ -63,4 +33,29 @@ func (o *GlobalMerkleObject) ToChildren() (*MerkleNode, *merkletree.MerkleTree, 
 
 func (o *GlobalMerkleObject) ToParent(*MerkleNode, *merkletree.MerkleTree, error) error {
 	return nil
+}
+
+type Object struct {
+	Tree      *Tree     `json:"tree,inline"`
+	User      *User     `json:"user,inline"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Tree struct {
+	Leaf          string            `json:"leaf"` // leaf is the credential
+	Index         uint64            `json:"index"`
+	ProofElements []string          `json:"proof_elements"`
+	Root          string            `json:"root"`      // Merkle root after insertion
+	PrevRoot      string            `json:"prev_root"` // Optional: the previous root
+	Proof         *merkletree.Proof `json:"proof"`
+}
+
+type User struct {
+	ID           string `json:"id"`
+	Wallet       string `json:"wallet"`
+	CredentialID string `json:"credential_id"`
+}
+
+func (o *Object) Key() string {
+	return fmt.Sprintf("uid:root:credential")
 }
